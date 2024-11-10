@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,6 +21,23 @@ import { chatConverter } from "@/lib/chat";
 import { useCollectionData } from "react-firebase-hooks/firestore";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import SettingsComponent from "@/components/settings";
+import { ThemeProvider } from "next-themes";
+
+const SearchField = () => (
+  <div className="p-4">
+    <div className="relative w-full">
+      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+      <Input
+        type="text"
+        placeholder="Search contacts..."
+        className="pl-10 w-full focus-visible:ring-transparent"
+      />
+    </div>
+  </div>
+);
 
 const ChatLayout = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
@@ -33,42 +50,57 @@ const ChatLayout = ({ children }: { children: ReactNode }) => {
         )
       : null,
   );
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarContent>
-          {chats !== undefined && (
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {chats.map((chat) => (
-                    <SidebarMenuItem key={chat.id}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === `/${chat.id}`}
-                      >
-                        <Link href={chat.id}>{chat.id}</Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-        </SidebarContent>
-        <SidebarFooter>
-          {user != null && (
-            <UserSidebarMenu
-              user={user}
-              signOut={() => {
-                void signOut(firebase.auth);
-              }}
-            />
-          )}
-        </SidebarFooter>
-      </Sidebar>
-      {children}
-    </SidebarProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarContent>
+            <SearchField />
+            {chats !== undefined && (
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {chats.map((chat) => (
+                      <SidebarMenuItem key={chat.id}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={pathname === `/${chat.id}`}
+                        >
+                          <Link href={chat.id}>{chat.id}</Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
+          </SidebarContent>
+          <SidebarFooter>
+            {user != null && (
+              <UserSidebarMenu
+                user={user}
+                signOut={() => {
+                  void signOut(firebase.auth);
+                }}
+                setIsSettingsOpen={setIsSettingsOpen}
+              />
+            )}
+          </SidebarFooter>
+        </Sidebar>
+        {children}
+        <SettingsComponent
+          isSettingsOpen={isSettingsOpen}
+          setIsSettingsOpen={setIsSettingsOpen}
+        />
+      </SidebarProvider>
+    </ThemeProvider>
   );
 };
 

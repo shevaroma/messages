@@ -40,9 +40,11 @@ const UserText = ({ user }: { user: User }) => (
 const UserSidebarMenu = ({
   user,
   signOut,
+  setIsSettingsOpen,
 }: {
   user: User;
   signOut: () => void;
+  setIsSettingsOpen: (isOpen: boolean) => void;
 }) => (
   <SidebarMenu>
     <SidebarMenuItem>
@@ -71,7 +73,7 @@ const UserSidebarMenu = ({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
               <Settings />
               Settings
             </DropdownMenuItem>

@@ -35,8 +35,8 @@ const Bubble = ({
     className={cn(
       "py-2 px-3 rounded-md text-sm",
       sent
-        ? "bg-zinc-900 text-white rounded-br-none"
-        : "bg-zinc-100 rounded-bl-none",
+        ? "bg-zinc-900 text-white rounded-br-none dark:bg-zinc-700"
+        : "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white",
       className,
     )}
   >
@@ -69,6 +69,12 @@ const MessageForm = ({
                 placeholder="Message"
                 className="resize-none focus-visible:ring-transparent"
                 {...field}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSubmit();
+                  }
+                }}
               />
             </FormControl>
           </FormItem>
