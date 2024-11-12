@@ -5,6 +5,7 @@ type Message = {
   content: string;
   sender: string;
   timestamp: FieldValue;
+  reaction?: string;
 };
 
 const message = (
@@ -16,14 +17,19 @@ const message = (
   content,
   sender,
   timestamp,
+  reaction: undefined,
 });
 
 const messageConverter: FirestoreDataConverter<Message> = {
-  toFirestore: (message) => ({
-    content: message.content,
-    sender: message.sender,
-    timestamp: message.timestamp,
-  }),
+  toFirestore: (message) => {
+    const data: any = {
+      content: message.content,
+      sender: message.sender,
+      timestamp: message.timestamp,
+    };
+    if (message.reaction !== undefined) data.reaction = message.reaction;
+    return data;
+  },
   fromFirestore: (snapshot, options) => {
     const data = snapshot.data(options);
     return {
@@ -31,6 +37,7 @@ const messageConverter: FirestoreDataConverter<Message> = {
       content: data.content,
       sender: data.sender,
       timestamp: data.timestamp,
+      reaction: data.reaction,
     };
   },
 };
