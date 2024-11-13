@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
   Check,
+  Paperclip,
   Pencil,
   SendHorizonal,
   Smile,
@@ -58,13 +59,65 @@ import {
 } from "@/components/ui/select";
 
 const reactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
-
-const themes: { [key: string]: { label: string; className: string } } = {
-  neutral: { label: "Neutral", className: "bg-zinc-900 dark:bg-zinc-700" },
-  blue: { label: "Blue", className: "bg-blue-600" },
-  green: { label: "Green", className: "bg-green-600" },
-  rose: { label: "Rose", className: "bg-rose-600" },
-  violet: { label: "Violet", className: "bg-violet-600" },
+const themes: {
+  [key: string]: {
+    label: string;
+    className: string;
+    background: React.CSSProperties;
+  };
+} = {
+  neutral: {
+    label: "Neutral",
+    className: "bg-zinc-900 dark:bg-zinc-700",
+    background: {
+      backgroundColor: "",
+      backgroundImage: "",
+    },
+  },
+  blue: {
+    label: "Blue",
+    className: "bg-blue-600",
+    background: {
+      backgroundColor: "#d1dbf7",
+      backgroundImage:
+        "radial-gradient(#1d4ed8 0.5px, transparent 0.5px), radial-gradient(#1d4ed8 0.5px, #d1dbf7 0.5px)",
+      backgroundSize: "20px 20px",
+      backgroundPosition: "0 0, 10px 10px",
+    },
+  },
+  green: {
+    label: "Green",
+    className: "bg-green-600",
+    background: {
+      backgroundColor: "#daede3",
+      backgroundImage:
+        "radial-gradient(#047857 0.5px, transparent 0.5px), radial-gradient(#047857 0.5px, #daede3 0.5px)",
+      backgroundSize: "20px 20px",
+      backgroundPosition: "0 0, 10px 10px",
+    },
+  },
+  rose: {
+    label: "Rose",
+    className: "bg-rose-600",
+    background: {
+      backgroundColor: "#fcd8de",
+      backgroundImage:
+        "radial-gradient(#be123c 0.5px, transparent 0.5px), radial-gradient(#be123c 0.5px, #fcd8de 0.5px)",
+      backgroundSize: "20px 20px",
+      backgroundPosition: "0 0, 10px 10px",
+    },
+  },
+  violet: {
+    label: "Violet",
+    className: "bg-violet-600",
+    background: {
+      backgroundColor: "#e1d4f7",
+      backgroundImage:
+        "radial-gradient(#6d28d9 0.5px, transparent 0.5px), radial-gradient(#6d28d9 0.5px, #e1d4f7 0.5px)",
+      backgroundSize: "20px 20px",
+      backgroundPosition: "0 0, 10px 10px",
+    },
+  },
 };
 
 const Bubble = ({
@@ -141,7 +194,9 @@ const Bubble = ({
           "py-2 px-3 rounded-md text-sm",
           sent
             ? cn("text-white rounded-br-none", theme.className)
-            : "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white",
+            : theme.label === "Neutral"
+              ? "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white"
+              : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
         )}
       >
         {isEditing ? (
@@ -198,6 +253,9 @@ const MessageForm = ({
 }) => (
   <Form {...form}>
     <form onSubmit={onSubmit} className={cn("flex gap-4 items-end", className)}>
+      <Button disabled type="button" size="icon" variant="outline">
+        <Paperclip />
+      </Button>
       <FormField
         control={form.control}
         name="message"
@@ -289,7 +347,10 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
 
   return (
     <>
-      <div className="w-full flex flex-col">
+      <div
+        className="w-full flex flex-col"
+        style={chat ? themes[chat.theme].background : {}}
+      >
         <Header
           className="sticky top-0"
           trailingButtons={
