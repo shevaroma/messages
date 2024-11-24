@@ -26,7 +26,6 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
-  Check,
   Paperclip,
   Pencil,
   SendHorizonal,
@@ -128,11 +127,6 @@ const Bubble = ({
   theme,
   className = undefined,
   children,
-  isEditing,
-  onSaveEdit,
-  onCancelEdit,
-  editValue,
-  onEditChange,
 }: {
   sent: boolean;
   reaction?: string;
@@ -141,11 +135,6 @@ const Bubble = ({
   theme: { label: string; className: string };
   className?: string;
   children: ReactNode;
-  isEditing: boolean;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
-  editValue: string;
-  onEditChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
 }) => (
   <div
     className={cn("flex group gap-2", !sent && "flex-row-reverse", className)}
@@ -153,7 +142,7 @@ const Bubble = ({
     {sent ? (
       <Button
         variant="ghost"
-        className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center self-center"
         onClick={onEditClick}
       >
         <Pencil />
@@ -199,20 +188,7 @@ const Bubble = ({
               : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
         )}
       >
-        {isEditing ? (
-          <Textarea
-            value={editValue}
-            onChange={onEditChange}
-            className={cn(
-              "resize-none focus-visible:ring-transparent p-0 border-none rounded-none ring-0",
-              sent
-                ? cn("text-white", theme.className)
-                : "bg-zinc-100 dark:bg-zinc-800 dark:text-white",
-            )}
-          />
-        ) : (
-          children
-        )}
+        {children}
       </div>
       {reaction !== undefined && (
         <div
@@ -222,16 +198,6 @@ const Bubble = ({
           )}
         >
           {reaction}
-        </div>
-      )}
-      {isEditing && (
-        <div className="flex gap-2 mt-2 justify-end">
-          <Button onClick={onSaveEdit} className="h-9 w-9" variant="secondary">
-            <Check />
-          </Button>
-          <Button onClick={onCancelEdit} className="h-9 w-9" variant="outline">
-            <X />
-          </Button>
         </div>
       )}
     </div>
@@ -245,10 +211,14 @@ const messageFormSchema = z.object({
 const MessageForm = ({
   form,
   onSubmit,
+  isEditing,
+  onCancelEdit,
   className = undefined,
 }: {
   form: UseFormReturn<z.infer<typeof messageFormSchema>>;
   onSubmit: () => void;
+  isEditing: boolean;
+  onCancelEdit: () => void;
   className?: string;
 }) => (
   <Form {...form}>
@@ -277,9 +247,16 @@ const MessageForm = ({
           </FormItem>
         )}
       />
-      <Button type="submit" disabled={!form.formState.isValid} size="icon">
-        <SendHorizonal />
-      </Button>
+      <div className="flex flex-col items-center gap-2">
+        {isEditing && form.watch("message") && (
+          <Button onClick={onCancelEdit} size="icon" variant="secondary">
+            <X />
+          </Button>
+        )}
+        <Button type="submit" disabled={!form.formState.isValid} size="icon">
+          <SendHorizonal />
+        </Button>
+      </div>
     </form>
   </Form>
 );
@@ -303,8 +280,11 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     defaultValues: { message: "" },
   });
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<{
+    id: string;
+    content: string;
+  } | null>(null);
 
   const handleReaction = async (messageId: string, emoji: string) => {
     if (user == null) return;
@@ -320,23 +300,13 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
   };
 
   const handleEditClick = (messageId: string, currentValue: string) => {
-    setEditingMessageId(messageId);
-    setEditValue(currentValue);
-  };
-
-  const handleSaveEdit = async () => {
-    if (editingMessageId == null) return;
-    const messageDoc = doc(messageReference, editingMessageId);
-    await updateDoc(messageDoc, {
-      content: editValue,
-    });
-    setEditingMessageId(null);
-    setEditValue("");
+    setEditingMessage({ id: messageId, content: currentValue });
+    messageForm.setValue("message", currentValue);
   };
 
   const handleCancelEdit = () => {
     setEditingMessageId(null);
-    setEditValue("");
+    messageForm.reset();
   };
 
   const setTheme = async (theme: string) => {
@@ -373,7 +343,6 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
             chat !== undefined &&
             messages?.map((message) => {
               const sent = message.sender === user.uid;
-              const isEditing = editingMessageId === message.id;
               return (
                 <Bubble
                   key={message.id}
@@ -390,11 +359,6 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                     sent ? "self-end" : "self-start",
                   )}
                   theme={themes[chat.theme]}
-                  isEditing={isEditing}
-                  onSaveEdit={handleSaveEdit}
-                  onCancelEdit={handleCancelEdit}
-                  editValue={editValue}
-                  onEditChange={(e) => setEditValue(e.target.value)}
                 >
                   {message.content}
                 </Bubble>
@@ -403,14 +367,24 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
         </div>
         <MessageForm
           form={messageForm}
-          onSubmit={messageForm.handleSubmit((values) => {
+          onSubmit={messageForm.handleSubmit(async (values) => {
             if (user == null) return;
-            void addDoc(
-              messageReference,
-              message(values.message, user.uid, serverTimestamp()),
-            );
+            if (editingMessage) {
+              const messageDoc = doc(messageReference, editingMessage.id);
+              await updateDoc(messageDoc, {
+                content: values.message,
+              });
+              setEditingMessage(null);
+            } else {
+              void addDoc(
+                messageReference,
+                message(values.message, user.uid, serverTimestamp()),
+              );
+            }
             messageForm.reset();
           })}
+          isEditing={editingMessage !== null}
+          onCancelEdit={handleCancelEdit}
           className="sticky bottom-0 p-4 border-t bg-background"
         />
       </div>
