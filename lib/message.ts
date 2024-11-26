@@ -6,6 +6,7 @@ type Message = {
   sender: string;
   timestamp: FieldValue;
   reaction?: string;
+  read: boolean;
 };
 
 const message = (
@@ -18,6 +19,7 @@ const message = (
   sender,
   timestamp,
   reaction: undefined,
+  read: false,
 });
 
 const messageConverter: FirestoreDataConverter<Message> = {
@@ -28,6 +30,7 @@ const messageConverter: FirestoreDataConverter<Message> = {
       timestamp: message.timestamp,
     };
     if (message.reaction !== undefined) data.reaction = message.reaction;
+    data.readBy = message.read;
     return data;
   },
   fromFirestore: (snapshot, options) => {
@@ -38,6 +41,7 @@ const messageConverter: FirestoreDataConverter<Message> = {
       sender: data.sender,
       timestamp: data.timestamp,
       reaction: data.reaction,
+      read: data.read,
     };
   },
 };

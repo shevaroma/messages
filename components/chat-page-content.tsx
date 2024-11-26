@@ -26,6 +26,8 @@ import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
+  Check,
+  CheckCheck,
   Paperclip,
   Pencil,
   SendHorizonal,
@@ -33,7 +35,7 @@ import {
   SwatchBook,
   X,
 } from "lucide-react";
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useEffect, useRef, useState } from "react";
 import Header from "@/components/header";
 import {
   Popover,
@@ -56,6 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import useOnScreen from "@/hooks/use-on-screen";
 
 const reactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 const themes: {
@@ -127,6 +130,8 @@ const Bubble = ({
   theme,
   className = undefined,
   children,
+  read,
+  markAsRead,
 }: {
   sent: boolean;
   reaction?: string;
@@ -135,74 +140,94 @@ const Bubble = ({
   theme: { label: string; className: string };
   className?: string;
   children: ReactNode;
-}) => (
-  <div
-    className={cn("flex group gap-2", !sent && "flex-row-reverse", className)}
-  >
-    {sent ? (
-      <Button
-        variant="ghost"
-        className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center self-center"
-        onClick={onEditClick}
-      >
-        <Pencil />
-      </Button>
-    ) : (
-      <Popover>
-        <PopoverTrigger
-          asChild
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
+  read?: boolean;
+  markAsRead: () => void;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const isOnScreen = useOnScreen(ref);
+  useEffect(() => {
+    if (isOnScreen && !sent) markAsRead();
+  }, [isOnScreen, sent]);
+  return (
+    <div
+      className={cn("flex group gap-2", !sent && "flex-row-reverse", className)}
+      ref={ref}
+    >
+      {sent ? (
+        <Button
+          variant="ghost"
+          className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center self-center"
+          onClick={onEditClick}
         >
-          <Button variant="ghost" className="h-9 w-9">
-            <Smile />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-full p-1 rounded-xl">
-          {reactions.map((buttonReaction) => (
-            <Button
-              key={buttonReaction}
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "text-base",
-                reaction === buttonReaction && "bg-accent",
-              )}
-              onClick={() => {
-                onReactionClick(buttonReaction);
-              }}
-            >
-              {buttonReaction}
+          <Pencil />
+        </Button>
+      ) : (
+        <Popover>
+          <PopoverTrigger
+            asChild
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Button variant="ghost" className="h-9 w-9">
+              <Smile />
             </Button>
-          ))}
-        </PopoverContent>
-      </Popover>
-    )}
-    <div className="flex flex-col">
-      <div
-        className={cn(
-          "py-2 px-3 rounded-md text-sm",
-          sent
-            ? cn("text-white rounded-br-none", theme.className)
-            : theme.label === "Neutral"
-              ? "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white"
-              : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
-        )}
-      >
-        {children}
-      </div>
-      {reaction !== undefined && (
+          </PopoverTrigger>
+          <PopoverContent className="w-full p-1 rounded-xl">
+            {reactions.map((buttonReaction) => (
+              <Button
+                key={buttonReaction}
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  "text-base",
+                  reaction === buttonReaction && "bg-accent",
+                )}
+                onClick={() => {
+                  onReactionClick(buttonReaction);
+                }}
+              >
+                {buttonReaction}
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+      )}
+      <div className="flex flex-col">
         <div
           className={cn(
-            "shadow-md -mt-2 bg-background text-sm p-[0.125rem] rounded-full aspect-square flex items-center justify-center",
-            sent ? "self-start" : "self-end",
+            "py-2 px-3 rounded-md text-sm flex items-center",
+            sent
+              ? cn("text-white rounded-br-none", theme.className)
+              : theme.label === "Neutral"
+                ? "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white"
+                : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
           )}
         >
-          {reaction}
+          <div className="text-justify">{children}</div>
+          {sent && !read && (
+            <div className="flex self-end mt-1 ml-2">
+              <Check className="h-2.5 w-2.5 text-white-500" />
+            </div>
+          )}
+          {sent && read && (
+            <div className="flex self-end mt-1 ml-2">
+              <CheckCheck className="h-2.5 w-2.5 text-white-500" />
+            </div>
+          )}
         </div>
-      )}
+        {reaction !== undefined && (
+          <div
+            className={cn(
+              "shadow-md -mt-2 bg-background text-sm p-[0.125rem] rounded-full aspect-square flex items-center justify-center",
+              sent ? "self-start" : "self-end",
+            )}
+          >
+            {reaction}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const messageFormSchema = z.object({
   message: z.string().min(1),
@@ -359,6 +384,13 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                     sent ? "self-end" : "self-start",
                   )}
                   theme={themes[chat.theme]}
+                  read={message.read}
+                  markAsRead={async () => {
+                    const messageDoc = doc(messageReference, message.id);
+                    await updateDoc(messageDoc, {
+                      read: true,
+                    });
+                  }}
                 >
                   {message.content}
                 </Bubble>
