@@ -310,6 +310,14 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     id: string;
     content: string;
   } | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollToLatestMessage = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToLatestMessage();
+  }, [messages]);
 
   const handleReaction = async (messageId: string, emoji: string) => {
     if (user == null) return;
@@ -396,6 +404,7 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                 </Bubble>
               );
             })}
+          <div ref={messagesEndRef} />
         </div>
         <MessageForm
           form={messageForm}
