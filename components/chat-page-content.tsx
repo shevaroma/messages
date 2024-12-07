@@ -7,6 +7,7 @@ import {
 import {
   addDoc,
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -29,7 +30,6 @@ import {
   Check,
   CheckCheck,
   Paperclip,
-  Pencil,
   SendHorizonal,
   Smile,
   SwatchBook,
@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import useOnScreen from "@/hooks/use-on-screen";
+import MessageActionsDropdown from "@/components/message-actions-dropdown";
 
 const reactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 const themes: {
@@ -127,21 +128,27 @@ const Bubble = ({
   reaction,
   onReactionClick,
   onEditClick,
+  onDeleteClick,
   theme,
   className = undefined,
   children,
   read,
   markAsRead,
+  time,
+  editedTime,
 }: {
   sent: boolean;
   reaction?: string;
   onReactionClick: (reaction: string) => void;
   onEditClick: () => void;
+  onDeleteClick: () => void;
   theme: { label: string; className: string };
   className?: string;
   children: ReactNode;
   read?: boolean;
   markAsRead: () => void;
+  time: string;
+  editedTime?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const isOnScreen = useOnScreen(ref);
@@ -157,9 +164,13 @@ const Bubble = ({
         <Button
           variant="ghost"
           className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center self-center"
-          onClick={onEditClick}
         >
-          <Pencil />
+          <MessageActionsDropdown
+            // onReply={onReplyClick}
+            // onForward={onForwardClick}
+            onEdit={onEditClick}
+            onDelete={onDeleteClick}
+          />
         </Button>
       ) : (
         <Popover>
@@ -194,7 +205,7 @@ const Bubble = ({
       <div className="flex flex-col">
         <div
           className={cn(
-            "py-2 px-3 rounded-md text-sm flex items-center",
+            "py-2 px-3 rounded-md text-sm flex flex-col",
             sent
               ? cn("text-white rounded-br-none", theme.className)
               : theme.label === "Neutral"
@@ -202,15 +213,18 @@ const Bubble = ({
                 : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
           )}
         >
-          <div className="text-justify">{children}</div>
-          {sent && !read && (
-            <div className="flex self-end mt-1 ml-2">
-              <Check className="h-2.5 w-2.5 text-white-500" />
-            </div>
-          )}
-          {sent && read && (
-            <div className="flex self-end mt-1 ml-2">
-              <CheckCheck className="h-2.5 w-2.5 text-white-500" />
+          <div className="text-justify mb-1">{children}</div>
+          {sent && (
+            <div className="flex self-end items-center">
+              <span className="text-xs text-white-500 text-[9.5px]">
+                {" "}
+                {editedTime ? `edited (${editedTime})` : time}
+              </span>
+              {read ? (
+                <CheckCheck className="h-2.5 w-2.5 text-white-500 ml-1" />
+              ) : (
+                <Check className="h-2.5 w-2.5 text-white-500 ml-1" />
+              )}
             </div>
           )}
         </div>
@@ -342,6 +356,47 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     messageForm.reset();
   };
 
+  const handleSubmit = messageForm.handleSubmit(async (values) => {
+    if (user == null) return;
+    if (editingMessage) {
+      const messageDoc = doc(messageReference, editingMessage.id);
+      await updateDoc(messageDoc, {
+        content: values.message,
+        editedTime: new Date()
+          .toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+          .toUpperCase(),
+      });
+      setEditingMessage(null);
+    } else {
+      void addDoc(
+        messageReference,
+        message(
+          values.message,
+          user.uid,
+          serverTimestamp(),
+          new Date()
+            .toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            })
+            .toUpperCase(),
+        ),
+      );
+    }
+    messageForm.reset();
+  });
+
+  const handleDeleteClick = async (messageId: string) => {
+    if (user == null) return;
+    const messageDoc = doc(messageReference, messageId);
+    await deleteDoc(messageDoc);
+  };
+
   const setTheme = async (theme: string) => {
     await updateDoc(chatReference, {
       theme: theme,
@@ -386,6 +441,7 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                   onEditClick={() =>
                     handleEditClick(message.id, message.content)
                   }
+                  onDeleteClick={() => handleDeleteClick(message.id)}
                   sent={sent}
                   className={cn(
                     "max-w-[calc(50%_-_0.5rem)]",
@@ -399,6 +455,8 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                       read: true,
                     });
                   }}
+                  time={message.time}
+                  editedTime={message.editedTime}
                 >
                   {message.content}
                 </Bubble>
@@ -408,22 +466,7 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
         </div>
         <MessageForm
           form={messageForm}
-          onSubmit={messageForm.handleSubmit(async (values) => {
-            if (user == null) return;
-            if (editingMessage) {
-              const messageDoc = doc(messageReference, editingMessage.id);
-              await updateDoc(messageDoc, {
-                content: values.message,
-              });
-              setEditingMessage(null);
-            } else {
-              void addDoc(
-                messageReference,
-                message(values.message, user.uid, serverTimestamp()),
-              );
-            }
-            messageForm.reset();
-          })}
+          onSubmit={handleSubmit}
           isEditing={editingMessage !== null}
           onCancelEdit={handleCancelEdit}
           className="sticky bottom-0 p-4 border-t bg-background"
