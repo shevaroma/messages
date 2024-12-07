@@ -9,6 +9,7 @@ type Message = {
   read: boolean;
   time: string;
   editedTime?: string;
+  replyTo?: string;
 };
 
 const message = (
@@ -16,6 +17,7 @@ const message = (
   sender: string,
   timestamp: FieldValue,
   time: string,
+  replyTo?: string,
 ): Message => ({
   id: "",
   content,
@@ -25,6 +27,7 @@ const message = (
   read: false,
   time,
   editedTime: undefined,
+  replyTo,
 });
 
 const messageConverter: FirestoreDataConverter<Message> = {
@@ -37,6 +40,8 @@ const messageConverter: FirestoreDataConverter<Message> = {
     };
     if (message.reaction !== undefined) data.reaction = message.reaction;
     data.readBy = message.read;
+    if (message.editedTime !== undefined) data.editedTime = message.editedTime;
+    if (message.replyTo !== undefined) data.replyTo = message.replyTo;
     return data;
   },
   fromFirestore: (snapshot, options) => {
@@ -50,6 +55,7 @@ const messageConverter: FirestoreDataConverter<Message> = {
       read: data.read,
       time: data.time,
       editedTime: data.editedTime,
+      replyTo: data.replyTo,
     };
   },
 };

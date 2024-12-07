@@ -17,6 +17,7 @@ import {
   updateDoc,
 } from "@firebase/firestore";
 import firebase from "@/lib/firebase";
+import type { Message } from "@/lib/message";
 import { message, messageConverter } from "@/lib/message";
 import { cn } from "@/lib/utils";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -29,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import {
   Check,
   CheckCheck,
+  CornerUpLeft,
   Paperclip,
   SendHorizonal,
   Smile,
@@ -136,6 +138,8 @@ const Bubble = ({
   markAsRead,
   time,
   editedTime,
+  onReplyClick,
+  repliedToMessage,
 }: {
   sent: boolean;
   reaction?: string;
@@ -149,6 +153,8 @@ const Bubble = ({
   markAsRead: () => void;
   time: string;
   editedTime?: string;
+  onReplyClick: () => void;
+  repliedToMessage?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const isOnScreen = useOnScreen(ref);
@@ -166,8 +172,8 @@ const Bubble = ({
           className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center self-center"
         >
           <MessageActionsDropdown
-            // onReply={onReplyClick}
-            // onForward={onForwardClick}
+            onReply={onReplyClick}
+            onForward={() => {}}
             onEdit={onEditClick}
             onDelete={onDeleteClick}
           />
@@ -213,6 +219,12 @@ const Bubble = ({
                 : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
           )}
         >
+          {repliedToMessage && (
+            <div className="text-xs italic border-l-2 border-gray-400 pl-2 mb-1">
+              {repliedToMessage.substring(0, 50)}
+              {repliedToMessage.length > 50 ? "..." : ""}
+            </div>
+          )}
           <div className="text-justify mb-1">{children}</div>
           {sent && (
             <div className="flex self-end items-center">
@@ -253,39 +265,64 @@ const MessageForm = ({
   isEditing,
   onCancelEdit,
   className = undefined,
+  replyingTo,
+  onCancelReply,
+  messages,
 }: {
   form: UseFormReturn<z.infer<typeof messageFormSchema>>;
   onSubmit: () => void;
   isEditing: boolean;
   onCancelEdit: () => void;
   className?: string;
+  replyingTo: { id: string; content: string } | null;
+  onCancelReply: () => void;
+  messages: Message[];
 }) => (
   <Form {...form}>
     <form onSubmit={onSubmit} className={cn("flex gap-4 items-end", className)}>
       <Button disabled type="button" size="icon" variant="outline">
         <Paperclip />
       </Button>
-      <FormField
-        control={form.control}
-        name="message"
-        render={({ field }) => (
-          <FormItem className="flex-grow">
-            <FormControl>
-              <Textarea
-                placeholder="Message"
-                className="resize-none focus-visible:ring-transparent"
-                {...field}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSubmit();
-                  }
-                }}
-              />
-            </FormControl>
-          </FormItem>
+      <div className="flex-grow">
+        {replyingTo !== null && (
+          <div className="mb-2 flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded-md">
+            <div className="flex items-center">
+              <CornerUpLeft className="h-4 w-4 mr-2 text-gray-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                Replying to:{" "}
+                {messages
+                  .find((m) => m.id === replyingTo.id)
+                  ?.content.substring(0, 50)}
+                ...
+              </span>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onCancelReply}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         )}
-      />
+        <FormField
+          control={form.control}
+          name="message"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <Textarea
+                  placeholder="Message"
+                  className="resize-none focus-visible:ring-transparent"
+                  {...field}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onSubmit();
+                    }
+                  }}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </div>
       <div className="flex flex-col items-center gap-2">
         {isEditing && form.watch("message") && (
           <Button onClick={onCancelEdit} size="icon" variant="secondary">
@@ -329,6 +366,11 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const [replyingTo, setReplyingTo] = useState<{
+    id: string;
+    content: string;
+  } | null>(null);
+
   useEffect(() => {
     scrollToLatestMessage();
   }, [messages]);
@@ -354,6 +396,10 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
   const handleCancelEdit = () => {
     setEditingMessageId(null);
     messageForm.reset();
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
   };
 
   const handleSubmit = messageForm.handleSubmit(async (values) => {
@@ -385,8 +431,14 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
               hour12: true,
             })
             .toUpperCase(),
+          replyingTo ? replyingTo.id : undefined,
         ),
       );
+      console.log("Sending message with reply:", {
+        message: values.message,
+        replyingTo: replyingTo,
+      });
+      setReplyingTo(null);
     }
     messageForm.reset();
   });
@@ -401,6 +453,10 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     await updateDoc(chatReference, {
       theme: theme,
     });
+  };
+
+  const onReplyClick = (messageId: string, content: string) => {
+    setReplyingTo({ id: messageId, content });
   };
 
   return (
@@ -430,7 +486,12 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
           {user != null &&
             chat !== undefined &&
             messages?.map((message) => {
+              console.log("Message:", message);
               const sent = message.sender === user.uid;
+              const repliedToMessage = message.replyTo
+                ? messages.find((m) => m.id === message.replyTo)
+                : null;
+              console.log("Replied to message:", repliedToMessage);
               return (
                 <Bubble
                   key={message.id}
@@ -457,6 +518,10 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                   }}
                   time={message.time}
                   editedTime={message.editedTime}
+                  onReplyClick={() => onReplyClick(message.id, message.content)}
+                  repliedToMessage={
+                    repliedToMessage ? repliedToMessage.content : undefined
+                  }
                 >
                   {message.content}
                 </Bubble>
@@ -470,6 +535,9 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
           isEditing={editingMessage !== null}
           onCancelEdit={handleCancelEdit}
           className="sticky bottom-0 p-4 border-t bg-background"
+          replyingTo={replyingTo}
+          onCancelReply={handleCancelReply}
+          messages={messages ?? []}
         />
       </div>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
