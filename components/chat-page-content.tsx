@@ -179,34 +179,51 @@ const Bubble = ({
           />
         </Button>
       ) : (
-        <Popover>
-          <PopoverTrigger
-            asChild
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <Button variant="ghost" className="h-9 w-9">
-              <Smile />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-full p-1 rounded-xl">
-            {reactions.map((buttonReaction) => (
+        <>
+          <Popover>
+            <PopoverTrigger
+              asChild
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Button variant="ghost" className="h-9 w-9">
+                <Smile />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-1 rounded-xl">
+              {reactions.map((buttonReaction) => (
+                <Button
+                  key={buttonReaction}
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "text-base",
+                    reaction === buttonReaction && "bg-accent",
+                  )}
+                  onClick={() => {
+                    onReactionClick(buttonReaction);
+                  }}
+                >
+                  {buttonReaction}
+                </Button>
+              ))}
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger
+              asChild
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
               <Button
-                key={buttonReaction}
                 size="icon"
                 variant="ghost"
-                className={cn(
-                  "text-base",
-                  reaction === buttonReaction && "bg-accent",
-                )}
-                onClick={() => {
-                  onReactionClick(buttonReaction);
-                }}
+                className="h-9 w-9"
+                onClick={onReplyClick}
               >
-                {buttonReaction}
+                <CornerUpLeft />
               </Button>
-            ))}
-          </PopoverContent>
-        </Popover>
+            </PopoverTrigger>
+          </Popover>
+        </>
       )}
       <div className="flex flex-col">
         <div
@@ -221,15 +238,21 @@ const Bubble = ({
         >
           {repliedToMessage && (
             <div className="text-xs italic border-l-2 border-gray-400 pl-2 mb-1">
-              {repliedToMessage.substring(0, 50)}
-              {repliedToMessage.length > 50 ? "..." : ""}
+              {typeof children === "string" &&
+                repliedToMessage.substring(
+                  0,
+                  Math.min(repliedToMessage.length, children.length),
+                )}
+              {typeof children === "string" &&
+              repliedToMessage.length > children.length
+                ? "..."
+                : ""}
             </div>
           )}
           <div className="text-justify mb-1">{children}</div>
           {sent && (
             <div className="flex self-end items-center">
-              <span className="text-xs text-white-500 text-[9.5px]">
-                {" "}
+              <span className="text-[9.5px] text-white-500">
                 {editedTime ? `edited (${editedTime})` : time}
               </span>
               {read ? (
@@ -362,8 +385,12 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     content: string;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isNewMessage, setIsNewMessage] = useState(false);
   const scrollToLatestMessage = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isNewMessage) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      setIsNewMessage(false);
+    }
   };
 
   const [replyingTo, setReplyingTo] = useState<{
@@ -418,6 +445,7 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
       });
       setEditingMessage(null);
     } else {
+      setIsNewMessage(true);
       void addDoc(
         messageReference,
         message(
