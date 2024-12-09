@@ -14,6 +14,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
 } from "@firebase/firestore";
 import firebase from "@/lib/firebase";
@@ -360,6 +361,46 @@ const MessageForm = ({
   </Form>
 );
 
+export function firestoreTimestampToDate(
+  timestamp: Timestamp | null | undefined,
+): Date {
+  if (!timestamp) {
+    throw new Error("Invalid timestamp");
+  }
+
+  return new Date(timestamp.seconds * 1000);
+}
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  } else {
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+};
+
+const renderDateSeparator = (date: string) => (
+  <div className="flex items-center my-4">
+    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+    <span className="mx-4 text-sm text-gray-500 dark:text-gray-400">
+      {formatDate(date)}
+    </span>
+    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+  </div>
+);
+
 const ChatPageContent = ({ chatID }: { chatID: string }) => {
   const [user] = useAuthState(firebase.auth);
   const chatCollectionReference = collection(firebase.firestore, "chats");
@@ -513,46 +554,62 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
         <div className="flex flex-grow flex-col gap-2 p-4">
           {user != null &&
             chat !== undefined &&
-            messages?.map((message) => {
-              console.log("Message:", message);
+            messages?.map((message, index) => {
               const sent = message.sender === user.uid;
               const repliedToMessage = message.replyTo
                 ? messages.find((m) => m.id === message.replyTo)
                 : null;
-              console.log("Replied to message:", repliedToMessage);
+              const timestampDate = message.timestamp
+                ? firestoreTimestampToDate(message.timestamp as Timestamp)
+                : new Date(0);
+              const showDateSeparator =
+                index === 0 ||
+                timestampDate.toDateString() !==
+                  (messages[index - 1].timestamp
+                    ? firestoreTimestampToDate(
+                        messages[index - 1].timestamp as Timestamp,
+                      ).toDateString()
+                    : new Date(0).toDateString());
+
               return (
-                <Bubble
-                  key={message.id}
-                  reaction={message.reaction}
-                  onReactionClick={(reaction) => {
-                    void handleReaction(message.id, reaction);
-                  }}
-                  onEditClick={() =>
-                    handleEditClick(message.id, message.content)
-                  }
-                  onDeleteClick={() => handleDeleteClick(message.id)}
-                  sent={sent}
-                  className={cn(
-                    "max-w-[calc(50%_-_0.5rem)]",
-                    sent ? "self-end" : "self-start",
-                  )}
-                  theme={themes[chat.theme]}
-                  read={message.read}
-                  markAsRead={async () => {
-                    const messageDoc = doc(messageReference, message.id);
-                    await updateDoc(messageDoc, {
-                      read: true,
-                    });
-                  }}
-                  time={message.time}
-                  editedTime={message.editedTime}
-                  onReplyClick={() => onReplyClick(message.id, message.content)}
-                  repliedToMessage={
-                    repliedToMessage ? repliedToMessage.content : undefined
-                  }
-                >
-                  {message.content}
-                </Bubble>
+                <React.Fragment key={message.id}>
+                  {showDateSeparator &&
+                    renderDateSeparator(timestampDate.toISOString())}
+                  <Bubble
+                    key={message.id}
+                    reaction={message.reaction}
+                    onReactionClick={(reaction) => {
+                      void handleReaction(message.id, reaction);
+                    }}
+                    onEditClick={() =>
+                      handleEditClick(message.id, message.content)
+                    }
+                    onDeleteClick={() => handleDeleteClick(message.id)}
+                    sent={sent}
+                    className={cn(
+                      "max-w-[calc(50%_-_0.5rem)]",
+                      sent ? "self-end" : "self-start",
+                    )}
+                    theme={themes[chat.theme]}
+                    read={message.read}
+                    markAsRead={async () => {
+                      const messageDoc = doc(messageReference, message.id);
+                      await updateDoc(messageDoc, {
+                        read: true,
+                      });
+                    }}
+                    time={message.time}
+                    editedTime={message.editedTime}
+                    onReplyClick={() =>
+                      onReplyClick(message.id, message.content)
+                    }
+                    repliedToMessage={
+                      repliedToMessage ? repliedToMessage.content : undefined
+                    }
+                  >
+                    {message.content}
+                  </Bubble>
+                </React.Fragment>
               );
             })}
           <div ref={messagesEndRef} />
