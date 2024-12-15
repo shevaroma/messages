@@ -425,12 +425,12 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     id: string;
     content: string;
   } | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isNewMessage, setIsNewMessage] = useState(false);
+  const [, setIsNewMessage] = useState(false);
   const scrollToLatestMessage = () => {
-    if (isNewMessage) {
+    if (!editingMessage && !deletingMessage) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      setIsNewMessage(false);
     }
   };
 
@@ -503,19 +503,18 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
           replyingTo ? replyingTo.id : undefined,
         ),
       );
-      console.log("Sending message with reply:", {
-        message: values.message,
-        replyingTo: replyingTo,
-      });
       setReplyingTo(null);
+      scrollToLatestMessage();
     }
     messageForm.reset();
   });
 
   const handleDeleteClick = async (messageId: string) => {
     if (user == null) return;
+    setDeletingMessage(true);
     const messageDoc = doc(messageReference, messageId);
     await deleteDoc(messageDoc);
+    setDeletingMessage(false);
   };
 
   const setTheme = async (theme: string) => {
