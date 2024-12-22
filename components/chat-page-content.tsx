@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/select";
 import useOnScreen from "@/hooks/use-on-screen";
 import MessageActionsDropdown from "@/components/message-actions-dropdown";
+import ExpendableSearch from "@/components/chat-searchbar";
 
 const reactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 const themes: {
@@ -127,6 +128,7 @@ const themes: {
 };
 
 const Bubble = ({
+  id,
   sent,
   reaction,
   onReactionClick,
@@ -141,7 +143,9 @@ const Bubble = ({
   editedTime,
   onReplyClick,
   repliedToMessage,
+  searchQuery,
 }: {
+  id: string;
   sent: boolean;
   reaction?: string;
   onReactionClick: (reaction: string) => void;
@@ -156,14 +160,30 @@ const Bubble = ({
   editedTime?: string;
   onReplyClick: () => void;
   repliedToMessage?: string;
+  searchQuery?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const isOnScreen = useOnScreen(ref);
   useEffect(() => {
     if (isOnScreen && !sent) markAsRead();
   }, [isOnScreen, sent]);
+
+  const highlightText = (text: string, query: string) => {
+    if (!query) return text;
+    const parts = text.split(new RegExp(`(${query})`, "gi"));
+    return parts.map((part, index) =>
+      part.toLowerCase() === query.toLowerCase() ? (
+        <span key={index} className="bg-amber-400">
+          {part}
+        </span>
+      ) : (
+        part
+      ),
+    );
+  };
   return (
     <div
+      id={id}
       className={cn("flex group gap-2", !sent && "flex-row-reverse", className)}
       ref={ref}
     >
@@ -250,7 +270,11 @@ const Bubble = ({
                 : ""}
             </div>
           )}
-          <div className="text-justify mb-1">{children}</div>
+          <div className="text-justify mb-1">
+            {typeof children === "string"
+              ? highlightText(children, searchQuery || "")
+              : children}
+          </div>
           {sent && (
             <div className="flex self-end items-center">
               <span className="text-[9.5px] text-white-500">
@@ -509,6 +533,21 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     messageForm.reset();
   });
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    const messageIndex = messages?.findIndex((message) =>
+      message.content.toLowerCase().includes(query.toLowerCase()),
+    );
+    if (messageIndex !== undefined && messageIndex > 0) {
+      const previousMessageIndex = messageIndex - 1;
+      const messageElement = document.getElementById(
+        `message-${previousMessageIndex}`,
+      );
+      messageElement?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   const handleDeleteClick = async (messageId: string) => {
     if (user == null) return;
     setDeletingMessage(true);
@@ -536,16 +575,23 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
         <Header
           className="sticky top-0"
           trailingButtons={
-            <Button
-              size="icon"
-              variant="ghost"
-              className="-mr-3"
-              onClick={() => {
-                setDialogOpen(true);
-              }}
-            >
-              <SwatchBook />
-            </Button>
+            <div className="flex flex-row">
+              <ExpendableSearch
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                handleSearch={handleSearch}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="-mr-3"
+                onClick={() => {
+                  setDialogOpen(true);
+                }}
+              >
+                <SwatchBook />
+              </Button>
+            </div>
           }
         >
           {chatID}
@@ -576,6 +622,8 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
                     renderDateSeparator(timestampDate.toISOString())}
                   <Bubble
                     key={message.id}
+                    id={`message-${index}`}
+                    searchQuery={searchQuery}
                     reaction={message.reaction}
                     onReactionClick={(reaction) => {
                       void handleReaction(message.id, reaction);
