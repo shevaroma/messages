@@ -181,32 +181,40 @@ const Bubble = ({
       ),
     );
   };
+
   return (
     <div
       id={id}
-      className={cn("flex group gap-2", !sent && "flex-row-reverse", className)}
+      className={cn(
+        "flex group gap-2 mb-0.5 relative z-10",
+        !sent && "flex-row-reverse",
+        reaction && "mb-4",
+        className,
+      )}
       ref={ref}
     >
       {sent ? (
-        <Button
-          variant="ghost"
-          className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center self-center"
-        >
-          <MessageActionsDropdown
-            onReply={onReplyClick}
-            onForward={() => {}}
-            onEdit={onEditClick}
-            onDelete={onDeleteClick}
-          />
-        </Button>
+        <div className="self-center">
+          <Button
+            variant="ghost"
+            className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-[1]"
+          >
+            <MessageActionsDropdown
+              onReply={onReplyClick}
+              onForward={() => {}}
+              onEdit={onEditClick}
+              onDelete={onDeleteClick}
+            />
+          </Button>
+        </div>
       ) : (
-        <>
+        <div className="flex self-center gap-1">
           <Popover>
             <PopoverTrigger
               asChild
               className="opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              <Button variant="ghost" className="h-9 w-9">
+              <Button variant="ghost" className="h-9 w-9 z-[1]">
                 <Smile />
               </Button>
             </PopoverTrigger>
@@ -237,19 +245,20 @@ const Bubble = ({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9"
+                className="h-9 w-9 z-[1]"
                 onClick={onReplyClick}
               >
                 <CornerUpLeft />
               </Button>
             </PopoverTrigger>
           </Popover>
-        </>
+        </div>
       )}
-      <div className="flex flex-col">
+
+      <div className="flex flex-col relative">
         <div
           className={cn(
-            "py-2 px-3 rounded-md text-sm flex flex-col",
+            "py-2 px-3 rounded-md text-sm flex flex-col z-[0]",
             sent
               ? cn("text-white rounded-br-none", theme?.className || "")
               : theme.label === "Neutral"
@@ -291,8 +300,8 @@ const Bubble = ({
         {reaction !== undefined && (
           <div
             className={cn(
-              "shadow-md -mt-2 bg-background text-sm p-[0.125rem] rounded-full aspect-square flex items-center justify-center",
-              sent ? "self-start" : "self-end",
+              "shadow-md bg-background text-sm p-1 rounded-full h-6 min-w-6 flex items-center justify-center absolute -bottom-3 z-[1]",
+              sent ? "left-0" : "right-0",
             )}
           >
             {reaction}
@@ -327,7 +336,13 @@ const MessageForm = ({
   messages: Message[];
 }) => (
   <Form {...form}>
-    <form onSubmit={onSubmit} className={cn("flex gap-4 items-end", className)}>
+    <form
+      onSubmit={onSubmit}
+      className={cn(
+        "flex gap-4 items-end z-50 sticky bottom-0 bg-background p-4",
+        className,
+      )}
+    >
       <Button disabled type="button" size="icon" variant="outline">
         <Paperclip />
       </Button>
@@ -577,7 +592,7 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
         }
       >
         <Header
-          className="sticky top-0"
+          className="sticky top-0 z-50"
           trailingButtons={
             <div className="flex flex-row">
               <ExpendableSearch
