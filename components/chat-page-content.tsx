@@ -151,7 +151,7 @@ const Bubble = ({
   onReactionClick: (reaction: string) => void;
   onEditClick: () => void;
   onDeleteClick: () => void;
-  theme: { label: string; className: string };
+  theme: { label: string; className: string; background: React.CSSProperties };
   className?: string;
   children: ReactNode;
   read?: boolean;
@@ -251,7 +251,7 @@ const Bubble = ({
           className={cn(
             "py-2 px-3 rounded-md text-sm flex flex-col",
             sent
-              ? cn("text-white rounded-br-none", theme.className)
+              ? cn("text-white rounded-br-none", theme?.className || "")
               : theme.label === "Neutral"
                 ? "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white"
                 : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
@@ -570,7 +570,11 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     <>
       <div
         className="w-full flex flex-col"
-        style={chat ? themes[chat.theme].background : {}}
+        style={
+          chat
+            ? themes[chat.theme || "neutral"].background
+            : themes["neutral"].background
+        }
       >
         <Header
           className="sticky top-0"
@@ -690,7 +694,9 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
               {chat !== undefined && (
                 <Select value={chat.theme} onValueChange={setTheme}>
                   <SelectTrigger className="w-[120px]">
-                    <SelectValue>{themes[chat.theme].label}</SelectValue>
+                    <SelectValue>
+                      {themes[chat.theme || "neutral"].label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
