@@ -279,23 +279,27 @@ const Bubble = ({
                 : ""}
             </div>
           )}
-          <div className="text-justify mb-1">
+          <div className="text-left mb-1">
             {typeof children === "string"
               ? highlightText(children, searchQuery || "")
               : children}
           </div>
-          {sent && (
-            <div className="flex self-end items-center">
-              <span className="text-[9.5px] text-white-500">
-                {editedTime ? `edited (${editedTime})` : time}
-              </span>
-              {read ? (
+          <div
+            className={cn(
+              "flex items-center",
+              sent ? "self-end" : "self-start",
+            )}
+          >
+            <span className="text-[9.5px] text-white-500">
+              {editedTime ? `edited (${editedTime})` : time}
+            </span>
+            {sent &&
+              (read ? (
                 <CheckCheck className="h-2.5 w-2.5 text-white-500 ml-1" />
               ) : (
                 <Check className="h-2.5 w-2.5 text-white-500 ml-1" />
-              )}
-            </div>
-          )}
+              ))}
+          </div>
         </div>
         {reaction !== undefined && (
           <div
