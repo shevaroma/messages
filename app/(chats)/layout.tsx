@@ -25,9 +25,10 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import SettingsComponent from "@/components/settings";
 import { ThemeProvider } from "next-themes";
+import NewConversationButton from "@/components/new-conversation-button";
 
 const SearchField = () => (
-  <div className="p-4">
+  <div className="px-4 pb-4">
     <div className="relative w-full">
       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
       <Input
@@ -62,6 +63,10 @@ const ChatLayout = ({ children }: { children: ReactNode }) => {
       <SidebarProvider>
         <Sidebar>
           <SidebarContent>
+            <div className="flex items-center justify-between px-4 py-3">
+              <h1 className="text-2xl font-bold text-gray-800">Chats</h1>
+              <NewConversationButton />
+            </div>
             <SearchField />
             {chats !== undefined && (
               <SidebarGroup>
