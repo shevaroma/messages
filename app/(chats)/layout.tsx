@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import firebase from "@/lib/firebase";
 import UserSidebarMenu from "@/components/user-sidebar-menu";
 import { signOut } from "@firebase/auth";
-import { collection, query, where } from "@firebase/firestore";
+import { collection, doc, getDoc, query, where } from "@firebase/firestore";
 import { chatConverter } from "@/lib/chat";
 import { useCollectionData } from "react-firebase-hooks/firestore";
 import Link from "next/link";
@@ -52,6 +52,31 @@ const ChatLayout = ({ children }: { children: ReactNode }) => {
       : null,
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [chatUsers, setChatUsers] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    const fetchChatUsers = async () => {
+      if (chats) {
+        const usersData: { [key: string]: string } = {};
+        for (const chat of chats) {
+          const otherUserId = chat.members.find(
+            (member: string) => member !== user?.uid,
+          );
+          if (otherUserId) {
+            const userDoc = await getDoc(
+              doc(firebase.firestore, "users", otherUserId),
+            );
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              usersData[chat.id] = `${userData.displayName}`;
+            }
+          }
+        }
+        setChatUsers(usersData);
+      }
+    };
+    void fetchChatUsers();
+  }, [chats, user]);
 
   return (
     <ThemeProvider
@@ -78,7 +103,9 @@ const ChatLayout = ({ children }: { children: ReactNode }) => {
                           asChild
                           isActive={pathname === `/${chat.id}`}
                         >
-                          <Link href={chat.id}>{chat.id}</Link>
+                          <Link href={chat.id}>
+                            {chatUsers[chat.id] || chat.id}
+                          </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}

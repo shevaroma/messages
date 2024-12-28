@@ -585,6 +585,34 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
     setReplyingTo({ id: messageId, content });
   };
 
+  const [chatUser, setChatUser] = useState<{
+    name: string;
+    photoURL: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const fetchChatUser = async () => {
+      if (chat) {
+        const otherUserId = chat.members.find(
+          (member: string) => member !== user?.uid,
+        );
+        if (otherUserId) {
+          const userDoc = await getDoc(
+            doc(firebase.firestore, "users", otherUserId),
+          );
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setChatUser({
+              name: userData.displayName,
+              photoURL: userData.photoURL,
+            });
+          }
+        }
+      }
+    };
+    void fetchChatUser();
+  }, [chat, user]);
+
   return (
     <>
       <div
@@ -617,7 +645,18 @@ const ChatPageContent = ({ chatID }: { chatID: string }) => {
             </div>
           }
         >
-          {chatID}
+          {chatUser ? (
+            <div className="flex items-center gap-2">
+              <img
+                src={chatUser.photoURL}
+                alt={chatUser.name}
+                className="w-8 h-8 rounded-full"
+              />
+              <span className="font-semibold">{chatUser.name}</span>
+            </div>
+          ) : (
+            chatID
+          )}
         </Header>
         <div className="flex flex-grow flex-col gap-2 p-4">
           {user != null &&
