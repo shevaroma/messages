@@ -1,50 +1,84 @@
 import { Button } from "@/components/ui/button";
-import { Ellipsis, Forward, Pencil, Reply, Trash } from "lucide-react";
+import { Ellipsis, Forward, Pencil, Smile } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import React from "react";
 
-type DropdownMenuProps = {
-  onReply: () => void;
-  onForward: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-};
+const reactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 
 const MessageActionsDropdown = ({
-  onReply,
   onForward,
+  onReact,
+  reaction,
   onEdit,
-  onDelete,
-}: DropdownMenuProps) => {
+}: {
+  onForward: () => void;
+  onReact: ((reaction: string | undefined) => void) | null;
+  reaction: string | undefined;
+  onEdit: (() => void) | null;
+}) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-9 w-9">
+        <Button size="icon" variant="ghost">
           <Ellipsis />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-30">
+      <DropdownMenuContent>
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={onReply}>
-            <Reply className="mr-2" />
-            <span>Reply</span>
-          </DropdownMenuItem>
+          {onReact !== null && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Smile />
+                React
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  <div className="flex">
+                    {reactions.map((buttonReaction) => (
+                      <Button
+                        key={buttonReaction}
+                        size="icon"
+                        variant="ghost"
+                        className={cn(
+                          "text-base",
+                          reaction === buttonReaction && "bg-accent",
+                        )}
+                        onClick={() => {
+                          onReact(
+                            buttonReaction === reaction
+                              ? undefined
+                              : buttonReaction,
+                          );
+                        }}
+                      >
+                        {buttonReaction}
+                      </Button>
+                    ))}
+                  </div>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          )}
+          {onEdit !== null && (
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil />
+              <span>Edit</span>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={onForward}>
-            <Forward className="mr-2" />
+            <Forward />
             <span>Forward</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onEdit}>
-            <Pencil className="mr-2" />
-            <span>Edit</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDelete} className="text-red-600">
-            <Trash className="mr-2" />
-            <span>Delete</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

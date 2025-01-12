@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "next-themes";
+import React from "react";
 
 export const metadata: Metadata = { title: "Messages" };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
+const RootLayout = ({ children }: { children: React.ReactNode }) => (
+  <html lang="en" suppressHydrationWarning>
+    <body>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        {children}
+      </ThemeProvider>
+    </body>
+  </html>
+);
+
+export default RootLayout;

@@ -8,13 +8,13 @@ export default function useOnScreen(ref: RefObject<HTMLElement>) {
       new IntersectionObserver(([entry]) =>
         setIntersecting(entry.isIntersecting),
       ),
-    [ref],
+    [],
   );
 
   useEffect(() => {
     if (ref.current !== null) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, []);
+  }, [ref, observer]);
 
   return isIntersecting;
 }

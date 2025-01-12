@@ -1,776 +1,146 @@
 "use client";
 
+import { doc, updateDoc } from "@firebase/firestore";
+import React, { useState } from "react";
+import MessageForm from "@/components/message-form";
+import useChatPageData from "@/hooks/use-chat-page-data";
+import ForwardDialog from "@/components/forward-dialog";
 import {
-  useCollectionData,
-  useDocumentData,
-} from "react-firebase-hooks/firestore";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  deleteField,
-  doc,
-  getDoc,
-  orderBy,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-} from "@firebase/firestore";
-import firebase from "@/lib/firebase";
-import type { Message } from "@/lib/message";
-import { message, messageConverter } from "@/lib/message";
-import { cn } from "@/lib/utils";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, UseFormReturn } from "react-hook-form";
-import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import {
-  Check,
-  CheckCheck,
-  CornerUpLeft,
-  Paperclip,
-  SendHorizonal,
-  Smile,
-  SwatchBook,
-  X,
-} from "lucide-react";
-import React, { ReactNode, useEffect, useRef, useState } from "react";
-import Header from "@/components/header";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { chatConverter } from "@/lib/chat";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import useOnScreen from "@/hooks/use-on-screen";
-import MessageActionsDropdown from "@/components/message-actions-dropdown";
-import ExpendableSearch from "@/components/chat-searchbar";
-
-const reactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
-const themes: {
-  [key: string]: {
-    label: string;
-    className: string;
-    background: React.CSSProperties;
-  };
-} = {
-  neutral: {
-    label: "Neutral",
-    className: "bg-zinc-900 dark:bg-zinc-700",
-    background: {
-      backgroundColor: "",
-      backgroundImage: "",
-    },
-  },
-  blue: {
-    label: "Blue",
-    className: "bg-blue-600",
-    background: {
-      backgroundColor: "#d1dbf7",
-      backgroundImage:
-        "radial-gradient(#1d4ed8 0.5px, transparent 0.5px), radial-gradient(#1d4ed8 0.5px, #d1dbf7 0.5px)",
-      backgroundSize: "20px 20px",
-      backgroundPosition: "0 0, 10px 10px",
-    },
-  },
-  green: {
-    label: "Green",
-    className: "bg-green-600",
-    background: {
-      backgroundColor: "#daede3",
-      backgroundImage:
-        "radial-gradient(#047857 0.5px, transparent 0.5px), radial-gradient(#047857 0.5px, #daede3 0.5px)",
-      backgroundSize: "20px 20px",
-      backgroundPosition: "0 0, 10px 10px",
-    },
-  },
-  rose: {
-    label: "Rose",
-    className: "bg-rose-600",
-    background: {
-      backgroundColor: "#fcd8de",
-      backgroundImage:
-        "radial-gradient(#be123c 0.5px, transparent 0.5px), radial-gradient(#be123c 0.5px, #fcd8de 0.5px)",
-      backgroundSize: "20px 20px",
-      backgroundPosition: "0 0, 10px 10px",
-    },
-  },
-  violet: {
-    label: "Violet",
-    className: "bg-violet-600",
-    background: {
-      backgroundColor: "#e1d4f7",
-      backgroundImage:
-        "radial-gradient(#6d28d9 0.5px, transparent 0.5px), radial-gradient(#6d28d9 0.5px, #e1d4f7 0.5px)",
-      backgroundSize: "20px 20px",
-      backgroundPosition: "0 0, 10px 10px",
-    },
-  },
-};
-
-const Bubble = ({
-  id,
-  sent,
-  reaction,
-  onReactionClick,
-  onEditClick,
-  onDeleteClick,
-  theme,
-  className = undefined,
-  children,
-  read,
-  markAsRead,
-  time,
-  editedTime,
-  onReplyClick,
-  repliedToMessage,
-  searchQuery,
-}: {
-  id: string;
-  sent: boolean;
-  reaction?: string;
-  onReactionClick: (reaction: string) => void;
-  onEditClick: () => void;
-  onDeleteClick: () => void;
-  theme: { label: string; className: string; background: React.CSSProperties };
-  className?: string;
-  children: ReactNode;
-  read?: boolean;
-  markAsRead: () => void;
-  time: string;
-  editedTime?: string;
-  onReplyClick: () => void;
-  repliedToMessage?: string;
-  searchQuery?: string;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const isOnScreen = useOnScreen(ref);
-  useEffect(() => {
-    if (isOnScreen && !sent) markAsRead();
-  }, [isOnScreen, sent]);
-
-  const highlightText = (text: string, query: string) => {
-    if (!query) return text;
-    const parts = text.split(new RegExp(`(${query})`, "gi"));
-    return parts.map((part, index) =>
-      part.toLowerCase() === query.toLowerCase() ? (
-        <span key={index} className="bg-amber-400">
-          {part}
-        </span>
-      ) : (
-        part
-      ),
-    );
-  };
-
-  return (
-    <div
-      id={id}
-      className={cn(
-        "flex group gap-2 mb-0.5 relative z-10",
-        !sent && "flex-row-reverse",
-        reaction && "mb-4",
-        className,
-      )}
-      ref={ref}
-    >
-      {sent ? (
-        <div className="self-center">
-          <Button
-            variant="ghost"
-            className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-[1]"
-          >
-            <MessageActionsDropdown
-              onReply={onReplyClick}
-              onForward={() => {}}
-              onEdit={onEditClick}
-              onDelete={onDeleteClick}
-            />
-          </Button>
-        </div>
-      ) : (
-        <div className="flex self-center gap-1">
-          <Popover>
-            <PopoverTrigger
-              asChild
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Button variant="ghost" className="h-9 w-9 z-[1]">
-                <Smile />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-1 rounded-xl">
-              {reactions.map((buttonReaction) => (
-                <Button
-                  key={buttonReaction}
-                  size="icon"
-                  variant="ghost"
-                  className={cn(
-                    "text-base",
-                    reaction === buttonReaction && "bg-accent",
-                  )}
-                  onClick={() => {
-                    onReactionClick(buttonReaction);
-                  }}
-                >
-                  {buttonReaction}
-                </Button>
-              ))}
-            </PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger
-              asChild
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9 z-[1]"
-                onClick={onReplyClick}
-              >
-                <CornerUpLeft />
-              </Button>
-            </PopoverTrigger>
-          </Popover>
-        </div>
-      )}
-
-      <div className="flex flex-col relative">
-        <div
-          className={cn(
-            "py-2 px-3 rounded-md text-sm flex flex-col z-[0]",
-            sent
-              ? cn("text-white rounded-br-none", theme?.className || "")
-              : theme.label === "Neutral"
-                ? "bg-zinc-100 rounded-bl-none dark:bg-zinc-800 dark:text-white"
-                : "bg-white rounded-bl-none dark:bg-zinc-800 dark:text-white",
-          )}
-        >
-          {repliedToMessage && (
-            <div className="text-xs italic border-l-2 border-gray-400 pl-2 mb-1">
-              {typeof children === "string" &&
-                repliedToMessage.substring(
-                  0,
-                  Math.min(repliedToMessage.length, children.length),
-                )}
-              {typeof children === "string" &&
-              repliedToMessage.length > children.length
-                ? "..."
-                : ""}
-            </div>
-          )}
-          <div className="text-left mb-1">
-            {typeof children === "string"
-              ? highlightText(children, searchQuery || "")
-              : children}
-          </div>
-          <div
-            className={cn(
-              "flex items-center",
-              sent ? "self-end" : "self-start",
-            )}
-          >
-            <span className="text-[9.5px] text-white-500">
-              {editedTime ? `edited (${editedTime})` : time}
-            </span>
-            {sent &&
-              (read ? (
-                <CheckCheck className="h-2.5 w-2.5 text-white-500 ml-1" />
-              ) : (
-                <Check className="h-2.5 w-2.5 text-white-500 ml-1" />
-              ))}
-          </div>
-        </div>
-        {reaction !== undefined && (
-          <div
-            className={cn(
-              "shadow-md bg-background text-sm p-1 rounded-full h-6 min-w-6 flex items-center justify-center absolute -bottom-3 z-[1]",
-              sent ? "left-0" : "right-0",
-            )}
-          >
-            {reaction}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const messageFormSchema = z.object({
-  message: z.string().min(1),
-});
-
-const MessageForm = ({
-  form,
-  onSubmit,
-  isEditing,
-  onCancelEdit,
-  className = undefined,
-  replyingTo,
-  onCancelReply,
-  messages,
-}: {
-  form: UseFormReturn<z.infer<typeof messageFormSchema>>;
-  onSubmit: () => void;
-  isEditing: boolean;
-  onCancelEdit: () => void;
-  className?: string;
-  replyingTo: { id: string; content: string } | null;
-  onCancelReply: () => void;
-  messages: Message[];
-}) => (
-  <Form {...form}>
-    <form
-      onSubmit={onSubmit}
-      className={cn(
-        "flex gap-4 items-end z-50 sticky bottom-0 bg-background p-4",
-        className,
-      )}
-    >
-      <Button disabled type="button" size="icon" variant="outline">
-        <Paperclip />
-      </Button>
-      <div className="flex-grow">
-        {replyingTo !== null && (
-          <div className="mb-2 flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded-md">
-            <div className="flex items-center">
-              <CornerUpLeft className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                Replying to:{" "}
-                {messages
-                  .find((m) => m.id === replyingTo.id)
-                  ?.content.substring(0, 50)}
-                ...
-              </span>
-            </div>
-            <Button size="sm" variant="ghost" onClick={onCancelReply}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        <FormField
-          control={form.control}
-          name="message"
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Textarea
-                  placeholder="Message"
-                  className="resize-none focus-visible:ring-transparent"
-                  {...field}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      onSubmit();
-                    }
-                  }}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        {isEditing && form.watch("message") && (
-          <Button onClick={onCancelEdit} size="icon" variant="secondary">
-            <X />
-          </Button>
-        )}
-        <Button type="submit" disabled={!form.formState.isValid} size="icon">
-          <SendHorizonal />
-        </Button>
-      </div>
-    </form>
-  </Form>
-);
-
-export function firestoreTimestampToDate(
-  timestamp: Timestamp | null | undefined,
-): Date {
-  if (!timestamp) {
-    throw new Error("Invalid timestamp");
-  }
-
-  return new Date(timestamp.seconds * 1000);
-}
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (date.toDateString() === today.toDateString()) {
-    return "Today";
-  } else if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  } else {
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }
-};
-
-const renderDateSeparator = (date: string) => (
-  <div className="flex items-center my-4">
-    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-    <span className="mx-4 text-sm text-gray-500 dark:text-gray-400">
-      {formatDate(date)}
-    </span>
-    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-  </div>
-);
+  addMessage,
+  Message,
+  updateMessageContent,
+  updateMessageReaction,
+} from "@/lib/message";
+import ChatPageHeader from "@/components/chat-page-header";
+import useFile from "@/hooks/use-file";
+import useSuggestions from "@/hooks/use-suggestions";
+import { MessageSquare } from "lucide-react";
+import MessageList from "@/components/message-list";
 
 const ChatPageContent = ({ chatID }: { chatID: string }) => {
-  const [user] = useAuthState(firebase.auth);
-  const chatCollectionReference = collection(firebase.firestore, "chats");
-  const chatReference = doc(chatCollectionReference, chatID);
-  const [chat] = useDocumentData(chatReference.withConverter(chatConverter));
-  const messageReference = collection(
-    firebase.firestore,
-    "chats",
-    chatID,
-    "messages",
-  ).withConverter(messageConverter);
-  const [messages] = useCollectionData(
-    query(messageReference, orderBy("timestamp")),
-  );
-  const messageForm = useForm<z.infer<typeof messageFormSchema>>({
-    resolver: zodResolver(messageFormSchema),
-    defaultValues: { message: "" },
+  const data = useChatPageData(chatID);
+  const [message, setMessage] = useState("");
+  const [editedMessageID, setEditedMessageID] = useState<string | null>(null);
+  const [previousEditedMessageContent, setPreviousEditedMessageContent] =
+    useState<string | null>(null);
+  const [forwardDialogState, setForwardDialogState] = useState<{
+    open: boolean;
+    message: Message | null;
+  }>({
+    open: false,
+    message: null,
   });
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [, setEditingMessageId] = useState<string | null>(null);
-  const [editingMessage, setEditingMessage] = useState<{
-    id: string;
-    content: string;
-  } | null>(null);
-  const [deletingMessage, setDeletingMessage] = useState<boolean>(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [, setIsNewMessage] = useState(false);
-  const scrollToLatestMessage = () => {
-    if (!editingMessage && !deletingMessage) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
-  const [replyingTo, setReplyingTo] = useState<{
-    id: string;
-    content: string;
-  } | null>(null);
-
-  useEffect(() => {
-    scrollToLatestMessage();
-  }, [messages]);
-
-  const handleReaction = async (messageId: string, emoji: string) => {
-    if (user == null) return;
-    const messageDoc = doc(messageReference, messageId);
-    // fetch the message
-    const messageSnapshot = await getDoc(messageDoc);
-    if (!messageSnapshot.exists()) return;
-    const messageData = messageSnapshot.data();
-    if (messageData == null) return;
-    await updateDoc(messageDoc, {
-      reaction: messageData.reaction !== emoji ? emoji : deleteField(),
-    });
-  };
-
-  const handleEditClick = (messageId: string, currentValue: string) => {
-    setEditingMessage({ id: messageId, content: currentValue });
-    messageForm.setValue("message", currentValue);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingMessageId(null);
-    messageForm.reset();
-  };
-
-  const handleCancelReply = () => {
-    setReplyingTo(null);
-  };
-
-  const handleSubmit = messageForm.handleSubmit(async (values) => {
-    if (user == null) return;
-    if (editingMessage) {
-      const messageDoc = doc(messageReference, editingMessage.id);
-      await updateDoc(messageDoc, {
-        content: values.message,
-        editedTime: new Date()
-          .toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          })
-          .toUpperCase(),
-      });
-      setEditingMessage(null);
-    } else {
-      setIsNewMessage(true);
-      void addDoc(
-        messageReference,
-        message(
-          values.message,
-          user.uid,
-          serverTimestamp(),
-          new Date()
-            .toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })
-            .toUpperCase(),
-          replyingTo ? replyingTo.id : undefined,
-        ),
-      );
-      setReplyingTo(null);
-      scrollToLatestMessage();
-    }
-    messageForm.reset();
-  });
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    const messageIndex = messages?.findIndex((message) =>
-      message.content.toLowerCase().includes(query.toLowerCase()),
-    );
-    if (messageIndex !== undefined && messageIndex > 0) {
-      const previousMessageIndex = messageIndex - 1;
-      const messageElement = document.getElementById(
-        `message-${previousMessageIndex}`,
-      );
-      messageElement?.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
-  const handleDeleteClick = async (messageId: string) => {
-    if (user == null) return;
-    setDeletingMessage(true);
-    const messageDoc = doc(messageReference, messageId);
-    await deleteDoc(messageDoc);
-    setDeletingMessage(false);
-  };
-
-  const setTheme = async (theme: string) => {
-    await updateDoc(chatReference, {
-      theme: theme,
-    });
-  };
-
-  const onReplyClick = (messageId: string, content: string) => {
-    setReplyingTo({ id: messageId, content });
-  };
-
-  const [chatUser, setChatUser] = useState<{
-    name: string;
-    photoURL: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const fetchChatUser = async () => {
-      if (chat) {
-        const otherUserId = chat.members.find(
-          (member: string) => member !== user?.uid,
-        );
-        if (otherUserId) {
-          const userDoc = await getDoc(
-            doc(firebase.firestore, "users", otherUserId),
-          );
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setChatUser({
-              name: userData.displayName,
-              photoURL: userData.photoURL,
-            });
-          }
-        }
-      }
-    };
-    void fetchChatUser();
-  }, [chat, user]);
-
+  const { file, setFile, fileDownloadURL } = useFile(chatID);
+  const suggestions = useSuggestions(data?.messages, data?.user);
+  if (data === null) return;
   return (
     <>
-      <div
-        className="w-full flex flex-col"
-        style={
-          chat
-            ? themes[chat.theme || "neutral"].background
-            : themes["neutral"].background
-        }
-      >
-        <Header
-          className="sticky top-0 z-50"
-          trailingButtons={
-            <div className="flex flex-row">
-              <ExpendableSearch
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                handleSearch={handleSearch}
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="-mr-3"
-                onClick={() => {
-                  setDialogOpen(true);
-                }}
-              >
-                <SwatchBook />
-              </Button>
-            </div>
-          }
-        >
-          {chatUser ? (
-            <div className="flex items-center gap-2">
-              <img
-                src={chatUser.photoURL}
-                alt={chatUser.name}
-                className="w-8 h-8 rounded-full"
-              />
-              <span className="font-semibold">{chatUser.name}</span>
-            </div>
-          ) : (
-            chatID
-          )}
-        </Header>
-        <div className="flex flex-grow flex-col gap-2 p-4">
-          {user != null &&
-            chat !== undefined &&
-            messages?.map((message, index) => {
-              const sent = message.sender === user.uid;
-              const repliedToMessage = message.replyTo
-                ? messages.find((m) => m.id === message.replyTo)
-                : null;
-              const timestampDate = message.timestamp
-                ? firestoreTimestampToDate(message.timestamp as Timestamp)
-                : new Date(0);
-              const showDateSeparator =
-                index === 0 ||
-                timestampDate.toDateString() !==
-                  (messages[index - 1].timestamp
-                    ? firestoreTimestampToDate(
-                        messages[index - 1].timestamp as Timestamp,
-                      ).toDateString()
-                    : new Date(0).toDateString());
-
-              return (
-                <React.Fragment key={message.id}>
-                  {showDateSeparator &&
-                    renderDateSeparator(timestampDate.toISOString())}
-                  <Bubble
-                    key={message.id}
-                    id={`message-${index}`}
-                    searchQuery={searchQuery}
-                    reaction={message.reaction}
-                    onReactionClick={(reaction) => {
-                      void handleReaction(message.id, reaction);
-                    }}
-                    onEditClick={() =>
-                      handleEditClick(message.id, message.content)
-                    }
-                    onDeleteClick={() => handleDeleteClick(message.id)}
-                    sent={sent}
-                    className={cn(
-                      "max-w-[calc(50%_-_0.5rem)]",
-                      sent ? "self-end" : "self-start",
-                    )}
-                    theme={themes[chat.theme]}
-                    read={message.read}
-                    markAsRead={async () => {
-                      const messageDoc = doc(messageReference, message.id);
-                      await updateDoc(messageDoc, {
-                        read: true,
-                      });
-                    }}
-                    time={message.time}
-                    editedTime={message.editedTime}
-                    onReplyClick={() =>
-                      onReplyClick(message.id, message.content)
-                    }
-                    repliedToMessage={
-                      repliedToMessage ? repliedToMessage.content : undefined
-                    }
-                  >
-                    {message.content}
-                  </Bubble>
-                </React.Fragment>
+      <div className="w-full flex flex-col h-screen">
+        <ChatPageHeader
+          theme={data.chat.theme}
+          chatReference={data.chatReference}
+          recipientDisplayName={data.recipientDisplayName}
+          recipientPhotoURL={data.recipientPhotoURL}
+          recipientEmail={data.recipientEmail}
+        />
+        {data.messages.length > 0 ? (
+          <MessageList
+            messages={data.messages}
+            user={data.user}
+            onRead={(message) => {
+              const messageDoc = doc(
+                data.messageCollectionReference,
+                message.id,
               );
-            })}
-          <div ref={messagesEndRef} />
-        </div>
+              void updateDoc(messageDoc, { read: true });
+            }}
+            theme={data.chat.theme}
+            onForward={(message) => {
+              setForwardDialogState({
+                open: true,
+                message: message,
+              });
+            }}
+            onEdit={(message) => {
+              if (message.content === undefined) return;
+              setEditedMessageID(message.id);
+              setPreviousEditedMessageContent(message.content);
+              setMessage(message.content);
+              setFile(undefined);
+            }}
+            onReact={(message, reaction) => {
+              void updateMessageReaction(message.id, chatID, reaction);
+            }}
+          />
+        ) : (
+          <div className="flex flex-grow flex-col gap-2 w-full items-center justify-center text-sm text-muted-foreground">
+            <MessageSquare />
+            No messages yet
+          </div>
+        )}
         <MessageForm
-          form={messageForm}
-          onSubmit={handleSubmit}
-          isEditing={editingMessage !== null}
-          onCancelEdit={handleCancelEdit}
-          className="sticky bottom-0 p-4 border-t bg-background"
-          replyingTo={replyingTo}
-          onCancelReply={handleCancelReply}
-          messages={messages ?? []}
+          message={message}
+          onMessageChange={setMessage}
+          isEditing={editedMessageID !== null}
+          onCancelEdit={() => {
+            setEditedMessageID(null);
+            setPreviousEditedMessageContent(null);
+            setMessage("");
+          }}
+          isEditedMessageChanged={
+            message.trim() !== previousEditedMessageContent
+          }
+          file={file}
+          onFileChange={setFile}
+          fileUploaded={fileDownloadURL !== undefined}
+          onSend={() => {
+            const trimmed = message.trim();
+            if (editedMessageID !== null) {
+              void updateMessageContent(editedMessageID, chatID, trimmed);
+            } else {
+              void addMessage(
+                chatID,
+                trimmed.length === 0 ? undefined : trimmed,
+                data.user,
+                false,
+                file?.name,
+                fileDownloadURL,
+              );
+              setMessage("");
+              setFile(undefined);
+            }
+            setEditedMessageID(null);
+            setPreviousEditedMessageContent(null);
+            setMessage("");
+          }}
+          suggestions={suggestions}
         />
       </div>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Customise chat appearance</DialogTitle>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col space-y-1">
-                <Label htmlFor="dark-mode" className="font-medium">
-                  Chat theme
-                </Label>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Visible to you and recipient
-                </span>
-              </div>
-              {chat !== undefined && (
-                <Select value={chat.theme} onValueChange={setTheme}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue>
-                      {themes[chat.theme || "neutral"].label}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {Object.keys(themes).map((key) => (
-                        <SelectItem key={key} value={key}>
-                          {themes[key].label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ForwardDialog
+        open={forwardDialogState.open}
+        onOpenChange={(open) => {
+          setForwardDialogState((previous) => ({
+            open: open,
+            message: previous.message,
+          }));
+        }}
+        user={data.user}
+        onForward={(chatID) => {
+          if (forwardDialogState.message === null) return;
+          void addMessage(
+            chatID,
+            forwardDialogState.message.content,
+            data.user,
+            true,
+            forwardDialogState.message.fileName,
+            forwardDialogState.message.fileDownloadURL,
+          );
+          setForwardDialogState((previous) => ({
+            open: false,
+            message: previous.message,
+          }));
+        }}
+      />
     </>
   );
 };
